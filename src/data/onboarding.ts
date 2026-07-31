@@ -41,19 +41,9 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       'Create your own selection of winter places that you liked the most and return to them when you want to discover them again.',
     buttonLabel: 'This is useful!',
   },
+
   {
     background: require('../assets/into-explorer-onboard-bg.png'),
-<<<<<<< HEAD
-    overlay: require('../assets/into-explorer-onboardimg6.png'),
-    title: 'Unlock Winter Premium',
-    description:
-      'Access exclusive winter locations and additional blog articles. Explore more destinations, discover fresh travel inspiration, and enjoy the complete winter experience.',
-    buttonLabel: 'Next',
-  },
-  {
-    background: require('../assets/into-explorer-onboard-bg.png'),
-=======
->>>>>>> new-ios
     overlay: require('../assets/into-explorer-onboardimg5.png'),
     title: 'Let your mood choose\nthe path',
     description:
