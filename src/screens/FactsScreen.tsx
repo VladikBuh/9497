@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
 
 import { FACTS } from '../data/facts';
 
@@ -23,7 +22,6 @@ import { colors, fonts, radius, spacing } from '../constants/theme';
 type FactsScreenProps = {
   savedIds: Set<number>;
   onToggleSave: (id: number) => void;
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
@@ -31,7 +29,6 @@ type FactsScreenProps = {
 export function FactsScreen({
   savedIds,
   onToggleSave,
-  onOpenPremium,
   activeTab,
   onTabPress,
 }: FactsScreenProps) {
@@ -63,12 +60,7 @@ export function FactsScreen({
                 { paddingTop: insets.top },
               ]}
             >
-              <View style={styles.FactsScreenTitleRow}>
-                <Text style={styles.FactsScreenTitleFiligree}>
-                  Winter Facts
-                </Text>
-                <PremiumBadge onPress={onOpenPremium} />
-              </View>
+              <Text style={styles.FactsScreenTitleFiligree}>Winter Facts</Text>
             </View>
           </View>
 
@@ -169,11 +161,6 @@ const styles = StyleSheet.create({
   },
   FactsScreenListChassis: {
     paddingHorizontal: 16,
-  },
-  FactsScreenTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   FactsScreenTitleFiligree: {
     color: colors.white,

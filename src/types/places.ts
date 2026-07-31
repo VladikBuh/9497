@@ -9,5 +9,4 @@ export type Place = {
   description: string;
   category: PlaceCategory;
   image: number;
-  premium?: boolean;
 };

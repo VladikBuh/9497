@@ -38,16 +38,6 @@ export const colors = {
 
   // Loader
   loaderSpinner: 'rgba(255,255,255,0.95)',
-
-  // Premium
-  premiumFeatureBg: '#95e4ef',
-  premiumDot: '#448ae8',
-  premiumSubtitle: '#448ae8',
-  premiumCardBorder: 'rgba(255, 255, 255, 0.2)',
-  premiumGlow: '#09c7e7',
-  premiumBuyGlow: 'rgba(229, 25, 26, 0.4)',
-  lockedOverlayTint: 'rgba(149, 228, 239, 0.85)',
-  lockedAvailableText: 'rgba(68, 140, 234, 0.8)',
 };
 
 export const fonts = {

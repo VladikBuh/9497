@@ -43,6 +43,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     background: require('../assets/into-explorer-onboard-bg.png'),
+<<<<<<< HEAD
     overlay: require('../assets/into-explorer-onboardimg6.png'),
     title: 'Unlock Winter Premium',
     description:
@@ -51,6 +52,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     background: require('../assets/into-explorer-onboard-bg.png'),
+=======
+>>>>>>> new-ios
     overlay: require('../assets/into-explorer-onboardimg5.png'),
     title: 'Let your mood choose\nthe path',
     description:

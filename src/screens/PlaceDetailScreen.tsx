@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
 import { PLACES } from '../data/places';
 
 import { colors, fonts, radius, spacing } from '../constants/theme';
@@ -25,7 +24,6 @@ type PlaceDetailScreenProps = {
   onBack: () => void;
   isSaved: boolean;
   onToggleSave: () => void;
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
@@ -35,7 +33,6 @@ export function PlaceDetailScreen({
   onBack,
   isSaved,
   onToggleSave,
-  onOpenPremium,
   activeTab,
   onTabPress,
 }: PlaceDetailScreenProps) {
@@ -90,7 +87,6 @@ export function PlaceDetailScreen({
               </AnimatedPressable>
               <Text style={styles.PlaceDetailScreenTitleFiligree}>Places</Text>
             </View>
-            <PremiumBadge onPress={onOpenPremium} />
           </View>
           {/* Card */}
           <FadeSlideIn style={styles.PlaceDetailScreenCardChassis}>

@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { PlaceCard } from '../components/places/PlaceCard';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
 import { PLACE_CATEGORIES, PLACES } from '../data/places';
 import { PlaceCategory } from '../types/places';
@@ -21,14 +20,12 @@ import { colors, fonts, radius, spacing } from '../constants/theme';
 
 type PlacesScreenProps = {
   onOpenPlace: (id: string) => void;
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
 
 export function PlacesScreen({
   onOpenPlace,
-  onOpenPremium,
   activeTab,
   onTabPress,
 }: PlacesScreenProps) {
@@ -65,10 +62,7 @@ export function PlacesScreen({
               ]}
             >
               <View style={{ paddingHorizontal: 16, marginBottom: 15 }}>
-                <View style={styles.PlacesScreenTitleRow}>
-                  <Text style={styles.PlacesScreenTitleFiligree}>Places</Text>
-                  <PremiumBadge onPress={onOpenPremium} />
-                </View>
+                <Text style={styles.PlacesScreenTitleFiligree}>Places</Text>
 
                 <View style={styles.PlacesScreenSearchLintel}>
                   <Text style={styles.PlacesScreenSearchEmojiSigil}>🔍</Text>
@@ -108,8 +102,6 @@ export function PlacesScreen({
                 key={item.id}
                 place={item}
                 onPress={() => onOpenPlace(item.id)}
-                locked={item.premium}
-                onOpenPremium={onOpenPremium}
               />
             ))}
           </FadeSlideIn>
@@ -141,11 +133,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  PlacesScreenTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   PlacesScreenTitleFiligree: {
     color: colors.white,
     fontFamily: fonts.sansBold,

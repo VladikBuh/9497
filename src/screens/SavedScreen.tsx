@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
 import { PlaceCard } from '../components/places/PlaceCard';
 import { PLACES, PLACE_CATEGORIES } from '../data/places';
 import { FACTS } from '../data/facts';
@@ -29,7 +28,6 @@ type SavedScreenProps = {
   onToggleSavePlace: (id: string) => void;
   onToggleSaveFact: (id: number) => void;
   onOpenPlace: (id: string) => void;
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
@@ -39,7 +37,6 @@ export function SavedScreen({
   savedFactIds,
   onToggleSaveFact,
   onOpenPlace,
-  onOpenPremium,
   activeTab,
   onTabPress,
 }: SavedScreenProps) {
@@ -83,10 +80,7 @@ export function SavedScreen({
                 { paddingTop: insets.top },
               ]}
             >
-              <View style={styles.SavedScreenTitleRow}>
-                <Text style={styles.SavedScreenTitleFiligree}>Saved</Text>
-                <PremiumBadge onPress={onOpenPremium} />
-              </View>
+              <Text style={styles.SavedScreenTitleFiligree}>Saved</Text>
             </View>
           </View>
 
@@ -276,11 +270,6 @@ const styles = StyleSheet.create({
   },
   SavedScreenHeaderInset: {
     paddingHorizontal: 16,
-  },
-  SavedScreenTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   SavedScreenTitleFiligree: {
     color: colors.white,

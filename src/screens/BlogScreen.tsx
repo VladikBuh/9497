@@ -14,24 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
-import { LockedOverlay } from '../components/premium/LockedOverlay';
 
 import { ARTICLES } from '../data/blog';
 
 import { colors, fonts, radius, spacing } from '../constants/theme';
 
 type BlogScreenProps = {
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
 
-export function BlogScreen({
-  onOpenPremium,
-  activeTab,
-  onTabPress,
-}: BlogScreenProps) {
+export function BlogScreen({ activeTab, onTabPress }: BlogScreenProps) {
   const insets = useSafeAreaInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -82,7 +75,6 @@ export function BlogScreen({
                     Winter Blog
                   </Text>
                 </View>
-                <PremiumBadge onPress={onOpenPremium} />
               </View>
             </View>
 
@@ -153,10 +145,7 @@ export function BlogScreen({
             <View
               style={[styles.BlogScreenHeaderInset, { paddingTop: insets.top }]}
             >
-              <View style={styles.BlogScreenTitleRow}>
-                <Text style={styles.BlogScreenTitleFiligree}>Winter Blog</Text>
-                <PremiumBadge onPress={onOpenPremium} />
-              </View>
+              <Text style={styles.BlogScreenTitleFiligree}>Winter Blog</Text>
             </View>
           </View>
 
@@ -187,8 +176,6 @@ export function BlogScreen({
                     resizeMode="contain"
                   />
                 </AnimatedPressable>
-
-                {index % 3 === 2 && <LockedOverlay onPress={onOpenPremium} />}
               </FadeSlideIn>
             ))}
           </View>
@@ -248,11 +235,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  BlogScreenTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   BlogScreenTitleFiligree: {
     color: colors.white,
     fontFamily: fonts.sansBold,

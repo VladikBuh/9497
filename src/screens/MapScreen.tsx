@@ -14,21 +14,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '../components/animated/AnimatedPressable';
 import { FadeSlideIn } from '../components/animated/FadeSlideIn';
 import { TabBar, TAB_BAR_TOTAL_HEIGHT } from '../components/nav/TabBar';
-import { PremiumBadge } from '../components/buttons/PremiumBadge';
 import { PLACES } from '../data/places';
 import { Place } from '../types/places';
 import { colors, fonts, radius } from '../constants/theme';
 
 type MapScreenProps = {
   onOpenPlace: (id: string) => void;
-  onOpenPremium: () => void;
   activeTab: number;
   onTabPress: (index: number) => void;
 };
 
 export function MapScreen({
   onOpenPlace,
-  onOpenPremium,
   activeTab,
   onTabPress,
 }: MapScreenProps) {
@@ -80,7 +77,6 @@ export function MapScreen({
               ) : null}
               <Text style={styles.MapScreenTitleFiligree}>Map</Text>
             </View>
-            <PremiumBadge onPress={onOpenPremium} />
           </View>
 
           {/* Map container */}
