@@ -445,185 +445,38 @@ function MyApp({navigation}) {
     if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
       return true;
     }
-    const supportedSchemes = [
-      'intent',
-      'tel',
-      'mailto',
-      'file',
-      'intent',
-      'tel',
-      'mailto',
-      'nl.abnamro.deeplink.psd2.consent',
-      'snsbank.nl',
-      'asnbank.nl',
-      'nl-asnbank-sign',
-      'revolut',
-      'myaccount.ing.com',
-      'bankieren.rabobank.nl',
-      'regiobank.nl',
-      'sms',
-      'scotiabank',
-      'nl-regiobank-sign',
-      'nl.rabobank.openbanking',
-      'triodosmobilebanking',
-      'nl-asnbank-sign',
-      'nl-snsbank-sign',
-      'nl.abnamro.deeplink.psd2.consent',
-      'bncmobile',
-      'itms-appss',
-      'itms-appss',
-      'tdct',
-      'paytmmp',
-      'bmoolbb',
-      'cibcbanking',
-      'conexus',
-      'rbcmobile',
-      'pcfbanking',
-      'funid',
-      'blank',
-      'phonepe',
-      'upi',
-      'whatsapp',
-      'gpay',
-      'tez',
-    ];
 
-    const cryptoSchemes = ['bitcoin', 'ethereum', 'litecoin', 'dogecoin', 'bitcoincash', 'tether', 'bch', 'dash', 'ripple', 'monero', 'zcash', 'stellar', 'usdcoin'];
     const {url} = event;
+    const urlScheme = url.split(':')[0].toLowerCase();
 
-    console.log('Click handleShouldStartLoadWithRequest==>', url);
-
-    const urlScheme = url.split(':')[0];
-    console.log('YYours scheme:' + urlScheme);
-
-    if (cryptoSchemes.includes(urlScheme)) {
-      try {
-        const address = url.split(':')[1]?.split('?')[0] || '';
-        if (address && Clipboard?.setString) {
-          Clipboard.setString(address);
-        }
-      } catch (e) {}
-      Linking.openURL(url).catch(() => {});
-      return false;
-    }
-
-    if (supportedSchemes.includes(urlScheme)) {
-      console.log('supported scheme' + urlScheme);
-      openExternalUrl(url);
-      console.log('opened' + urlScheme);
-
-      return false;
-    }
-
-    /*    if (url.startsWith('https://pay.paymentiq')) {
-          console.log("WebView", "Заблокирована загрузка PaymentIQ URL: " + url);
-          return true;
-        }*/
-    if (url.startsWith('mailto:')) {
-      openExternalUrl(url);
-      return false;
-    } else if (
-        url.includes('wa.me/') ||
-        url.includes('api.whatsapp.com/') ||
-        url.includes('web.whatsapp.com/') ||
-        url.includes('chat.whatsapp.com/') ||
-        url.includes('whatsapp.com/')
+    if (
+      url.includes('wa.me/') ||
+      url.includes('api.whatsapp.com/') ||
+      url.includes('web.whatsapp.com/') ||
+      url.includes('chat.whatsapp.com/') ||
+      url.includes('whatsapp.com/')
     ) {
-      // WhatsApp - пробуем открыть в приложении
       let whatsappUrl = url;
       if (url.includes('wa.me/')) {
         const match = url.match(/wa\.me\/(\d+)/);
-        if (match) {
-          whatsappUrl = `whatsapp://send?phone=${match[1]}`;
-        }
+        if (match) whatsappUrl = `whatsapp://send?phone=${match[1]}`;
       } else if (url.includes('api.whatsapp.com/send')) {
         whatsappUrl = url.replace(/https?:\/\/api\.whatsapp\.com\/send/, 'whatsapp://send');
       } else if (url.includes('chat.whatsapp.com/')) {
         const match = url.match(/chat\.whatsapp\.com\/([a-zA-Z0-9]+)/);
-        if (match) {
-          whatsappUrl = `whatsapp://chat?code=${match[1]}`;
-        }
+        if (match) whatsappUrl = `whatsapp://chat?code=${match[1]}`;
       } else if (url.includes('whatsapp.com/channel/')) {
         const match = url.match(/whatsapp\.com\/channel\/([a-zA-Z0-9]+)/);
-        if (match) {
-          whatsappUrl = `whatsapp://channel/${match[1]}`;
-        }
+        if (match) whatsappUrl = `whatsapp://channel/${match[1]}`;
       }
       Linking.openURL(whatsappUrl).catch(() => Linking.openURL(url));
       return false;
-    } else if (
-        url.startsWith('https://www.instagram.com/') ||
-        url.startsWith('https://instagram.com/')
-    ) {
-      // Instagram - пробуем открыть в приложении
-      const match = url.match(/instagram\.com\/([^/?]+)/);
-      if (match && match[1] !== 'p' && match[1] !== 'reel' && match[1] !== 'stories') {
-        const username = match[1];
-        Linking.openURL(`instagram://user?username=${username}`).catch(() => Linking.openURL(url));
-      } else {
-        Linking.openURL(url);
-      }
+    }
+
+    const internalSchemes = ['about', 'javascript', 'data', 'blob'];
+    if (!/^https?$/.test(urlScheme) && !internalSchemes.includes(urlScheme)) {
+      openExternalUrl(url);
       return false;
-    } else if (
-        url.startsWith('https://www.facebook.com/') ||
-        url.startsWith('https://m.facebook.com/') ||
-        url.startsWith('https://facebook.com/')
-    ) {
-      // Facebook - пробуем открыть в приложении
-      const match = url.match(/facebook\.com\/([^/?]+)/);
-      if (match) {
-        Linking.openURL(`fb://profile/${match[1]}`).catch(() => Linking.openURL(url));
-      } else {
-        Linking.openURL(url);
-      }
-      return false;
-    } else if (
-        url.startsWith('https://twitter.com/') ||
-        url.startsWith('https://x.com/')
-    ) {
-      // Twitter/X - пробуем открыть в приложении
-      const match = url.match(/(?:twitter|x)\.com\/([^/?]+)/);
-      if (match) {
-        const username = match[1];
-        Linking.openURL(`twitter://user?screen_name=${username}`).catch(() => Linking.openURL(url));
-      } else {
-        Linking.openURL(url);
-      }
-      return false;
-    } else if (url.startsWith('https://t.me/')) {
-      // Telegram - пробуем открыть в приложении
-      const match = url.match(/t\.me\/([^/?]+)/);
-      if (match) {
-        Linking.openURL(`tg://resolve?domain=${match[1]}`).catch(() => Linking.openURL(url));
-      } else {
-        Linking.openURL(url);
-      }
-      return false;
-    } else if (
-        url.includes('bitcoin') ||
-        url.includes('litecoin') ||
-        url.includes('dogecoin') ||
-        url.includes('tether') ||
-        url.includes('ethereum') ||
-        url.includes('bitcoincash') ||
-        url.includes('bch:') ||
-        url.includes('dash:') ||
-        url.includes('ripple:') ||
-        url.includes('monero:') ||
-        url.includes('zcash:') ||
-        url.includes('stellar:') ||
-        url.includes('usdcoin:')
-    ) {
-      try {
-        const address = url.split(':')[1]?.split('?')[0] || '';
-        if (address && Clipboard?.setString) {
-          Clipboard.setString(address);
-        }
-      } catch (e) {}
-      Linking.openURL(url).catch(() => {});
-      return false;
-    } else {
-      return true;
     }
 
     return true;
@@ -862,16 +715,6 @@ function MyApp({navigation}) {
                         const {targetUrl} = nativeEvent;
                         if (!targetUrl || targetUrl === 'about:blank') {return;}
                         if (targetUrl.includes('https://app.payment-gateway.io/static/loader.html')) {return;}
-
-                        const targetScheme = (targetUrl.split(':')[0] || '').toLowerCase();
-                        if (['bitcoin','ethereum','litecoin','dogecoin','bitcoincash','tether','bch','dash','ripple','monero','zcash','stellar','usdcoin'].includes(targetScheme)) {
-                          try {
-                            const address = targetUrl.split(':')[1]?.split('?')[0] || '';
-                            if (address && Clipboard?.setString) Clipboard.setString(address);
-                          } catch (e) {}
-                          Linking.openURL(targetUrl).catch(() => {});
-                          return;
-                        }
 
                         if (targetUrl.includes('pay.funid.com')) {
                           Linking.openURL(targetUrl);
