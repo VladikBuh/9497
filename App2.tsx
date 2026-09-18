@@ -442,6 +442,9 @@ function MyApp({navigation}) {
   };
 
   const handleShouldStartLoadWithRequest = event => {
+    if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
+      return true;
+    }
     const supportedSchemes = [
       'intent',
       'tel',
@@ -498,11 +501,9 @@ function MyApp({navigation}) {
         const address = url.split(':')[1]?.split('?')[0] || '';
         if (address && Clipboard?.setString) {
           Clipboard.setString(address);
-          console.log('crypto address copied:', address);
         }
-      } catch (e) {
-        console.log('crypto copy error:', e);
-      }
+      } catch (e) {}
+      Linking.openURL(url).catch(() => {});
       return false;
     }
 
@@ -617,11 +618,9 @@ function MyApp({navigation}) {
         const address = url.split(':')[1]?.split('?')[0] || '';
         if (address && Clipboard?.setString) {
           Clipboard.setString(address);
-          console.log('crypto address copied:', address);
         }
-      } catch (e) {
-        console.log('crypto copy error:', e);
-      }
+      } catch (e) {}
+      Linking.openURL(url).catch(() => {});
       return false;
     } else {
       return true;
@@ -796,6 +795,12 @@ function MyApp({navigation}) {
                       }
                     });
 
+                    document.addEventListener('submit', function(e) {
+                      if (e.target && e.target.target === '_blank') {
+                        e.target.target = '_self';
+                      }
+                    }, true);
+
                     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'js_ready' }));
                   })();
                   true;
@@ -807,8 +812,8 @@ function MyApp({navigation}) {
                             const address = msg.address || '';
                             if (address && Clipboard?.setString) {
                               Clipboard.setString(address);
-                              console.log('crypto address copied from JS:', address);
                             }
+                            if (msg.url) Linking.openURL(msg.url).catch(() => {});
                           } else if (msg.type === 'email_hash') {
                             capiData.current.emailHash = msg.hash;
                             console.log('email from form:', msg.value);
@@ -834,7 +839,6 @@ function MyApp({navigation}) {
                       allowsInlineMediaPlayback={true}
                       setSupportMultipleWindows={false}
                       thirdPartyCookiesEnabled={true}
-                      requiresProvisionalNavigation={true}
                       scalesPageToFit={true}
                       mediaPlaybackRequiresUserAction={false}
                       allowFileAccess={true}
@@ -863,13 +867,9 @@ function MyApp({navigation}) {
                         if (['bitcoin','ethereum','litecoin','dogecoin','bitcoincash','tether','bch','dash','ripple','monero','zcash','stellar','usdcoin'].includes(targetScheme)) {
                           try {
                             const address = targetUrl.split(':')[1]?.split('?')[0] || '';
-                            if (address && Clipboard?.setString) {
-                              Clipboard.setString(address);
-                              console.log('crypto address copied from onOpenWindow:', address);
-                            }
-                          } catch (e) {
-                            console.log('crypto copy error:', e);
-                          }
+                            if (address && Clipboard?.setString) Clipboard.setString(address);
+                          } catch (e) {}
+                          Linking.openURL(targetUrl).catch(() => {});
                           return;
                         }
 
