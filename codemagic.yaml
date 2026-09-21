@@ -11,8 +11,8 @@ workflows:
         XCODE_SCHEME: 'IntoFrozenExplorer' # <----
         BUNDLE_ID: 'com.jsdfjkk.djsdfjkneeiwl' # <----
         APP_STORE_APP_ID: 6791513051 # <----
-        APP_STORE_CONNECT_KEY_ID: 'T64MTSRR8Q' # <----
-        APP_STORE_CONNECT_ISSUER_ID: '6224e46f-9de0-4cea-94af-2a400b4525e2' # <----
+        APP_STORE_CONNECT_KEY_ID: '2RPA8U4YAZ' # <----
+        APP_STORE_CONNECT_ISSUER_ID: '5eb21f62-3d73-40af-b3d9-de3170d47a6d' # <----
         node: latest
         xcode: latest
         cocoapods: default
