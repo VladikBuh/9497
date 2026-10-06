@@ -126,7 +126,12 @@ function MyApp({navigation}) {
   const [AppInstanceId, setAppInstanceId] = useState<string | null>(null);
   //const unityRef = useRef(null);
 
-  // UA берётся только из скрытого WebView (onMessage ниже)
+  useEffect(() => {
+    DeviceInfo.getUserAgent().then(ua => {
+      const sysVersion = DeviceInfo.getSystemVersion();
+      setWebViewUA(prev => prev || `${ua} Version/${sysVersion} Safari/604.1`);
+    });
+  }, []);
 
   const cloDomainRef = useRef('');
   useEffect(() => {
