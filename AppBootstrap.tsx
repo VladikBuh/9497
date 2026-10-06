@@ -313,15 +313,22 @@ function HomeScreen({ navigation }) {
     } catch {}
   };
 
-  useEffect(() => {
-    DeviceInfo.getUserAgent().then(ua => {
-      const ver = DeviceInfo.getSystemVersion();
-      setFetchUA(`${ua} Version/${ver} Safari/604.1`);
-    });
-  }, []);
-
   return (
     <View style={styles.container}>
+      <View style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents="none">
+        <WebView
+          style={{ width: 1, height: 1 }}
+          source={{ html: '<html><body><script>window.ReactNativeWebView.postMessage(navigator.userAgent);</script></body></html>' }}
+          javaScriptEnabled
+          onMessage={e => {
+            if (fetchUA) return;
+            const ua  = e.nativeEvent.data;
+            const ver = DeviceInfo.getSystemVersion();
+            setFetchUA(`${ua} Version/${ver} Safari/604.1`);
+          }}
+        />
+      </View>
+
       <NavigationIndependentTree>
         <MainApp />
       </NavigationIndependentTree>
