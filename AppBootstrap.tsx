@@ -314,10 +314,18 @@ function HomeScreen({ navigation }) {
   };
 
   useEffect(() => {
+    const ver = DeviceInfo.getSystemVersion();
+    // Immediate fallback via DeviceInfo; hidden WebView overrides if it fires first
     DeviceInfo.getUserAgent().then(ua => {
-      const ver = DeviceInfo.getSystemVersion();
       setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
     });
+    // Hard timeout — if hidden WebView never fires, DeviceInfo guarantees startup
+    const t = setTimeout(() => {
+      DeviceInfo.getUserAgent().then(ua => {
+        setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
+      });
+    }, 2000);
+    return () => clearTimeout(t);
   }, []);
 
   return (
