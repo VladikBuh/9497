@@ -110,9 +110,10 @@ function HomeScreen({ navigation }) {
   const [contentUrl,  setContentUrl]  = useState('');
   const [fetchUA,     setFetchUA]     = useState('');
   const [justLinkUA,  setJustLinkUA]  = useState('');
-  const webViewRef  = useRef<any>(null);
-  const resolvedRef = useRef(false);
-  const [isTwoClick, setTwoClick]     = useState(false);
+  const webViewRef       = useRef<any>(null);
+  const resolvedRef      = useRef(false);
+  const initialLoadedRef = useRef(false);
+  const [isTwoClick, setTwoClick] = useState(false);
 
   useEffect(() => {
     DeviceInfo.getUserAgent().then(ua => {
@@ -284,11 +285,13 @@ function HomeScreen({ navigation }) {
               onLoadEnd={e => {
                 const url = e.nativeEvent.url;
                 console.log('[WV] loadEnd:', url);
-                if ((url === 'about:blank' || url === '') && contentUrl) {
-                  console.log('[WV] blank detected → forcing navigate to contentUrl');
+                if (!initialLoadedRef.current && (url === 'about:blank' || url === '') && contentUrl) {
+                  console.log('[WV] initial blank → forcing navigate to contentUrl');
                   webViewRef.current?.injectJavaScript(
                     `window.location.replace(${JSON.stringify(contentUrl)});true;`
                   );
+                } else if (url && url !== 'about:blank' && url !== '') {
+                  initialLoadedRef.current = true;
                 }
               }}
               onError={e => console.log('[WV] error:', e.nativeEvent.code, e.nativeEvent.description)}
