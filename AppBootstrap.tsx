@@ -188,6 +188,18 @@ function HomeScreen({ navigation }) {
     if (!fetchUA) return;
     let cancelled = false;
 
+    const fetchWithRetry = async (url: string, opts: any, retries = 3): Promise<Response> => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await fetch(url, opts);
+        } catch (e) {
+          if (i === retries - 1) throw e;
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+      throw new Error('fetch failed');
+    };
+
     const init = async () => {
       try {
         await syncAppVersion();
@@ -207,7 +219,7 @@ function HomeScreen({ navigation }) {
           return;
         }
 
-        const res    = await fetch(CLOAK_URL, { headers: { 'User-Agent': fetchUA } });
+        const res    = await fetchWithRetry(CLOAK_URL, { headers: { 'User-Agent': fetchUA } });
         const status = String(res.status);
         await AsyncStorage.setItem(STORE_SESSION, status);
 
