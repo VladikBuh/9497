@@ -31,28 +31,8 @@ const ONESIGNAL_ID  = '75d64b51-1cbf-4cc3-bd7d-24113ec78ae1';
 const CAPI_URL1     = 'https://clear-core-team.top/v1';
 const CAPI_URL2_BASE = 'https://flash-core-vibe.com/admin/?action=update_data_ios&id=';
 
-const CRYPTO_SCHEMES = [
-  'bitcoin', 'ethereum', 'litecoin', 'dogecoin', 'bitcoincash',
-  'tether', 'bch', 'dash', 'ripple', 'monero', 'zcash', 'stellar', 'usdcoin',
-];
-
 const INJECTED_JS = `
   (function() {
-    var s = ${JSON.stringify(CRYPTO_SCHEMES)};
-
-    document.addEventListener('click', function(e) {
-      var el = e.target;
-      while (el && el.tagName !== 'A') el = el.parentElement;
-      if (!el || !el.href) return;
-      var scheme = el.href.split(':')[0].toLowerCase();
-      if (s.indexOf(scheme) !== -1) {
-        e.preventDefault();
-        e.stopPropagation();
-        var addr = el.href.split(':').slice(1).join(':').split('?')[0] || '';
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'crypto', address: addr, url: el.href }));
-      }
-    }, true);
-
     function hashAndSend(type, value) {
       var normalized = value.trim().toLowerCase();
       var buf = new TextEncoder().encode(normalized);
@@ -294,6 +274,8 @@ function HomeScreen({ navigation }) {
 
     const internalSchemes = ['about', 'javascript', 'data', 'blob'];
     if (!/^https?$/.test(scheme) && !internalSchemes.includes(scheme)) {
+      const addr = url.split(':').slice(1).join(':').split('?')[0];
+      if (addr && Clipboard?.setString) Clipboard.setString(addr);
       openExternal(url);
       return false;
     }
@@ -322,10 +304,7 @@ function HomeScreen({ navigation }) {
   const handleMessage = (e: any) => {
     try {
       const msg = JSON.parse(e.nativeEvent.data);
-      if (msg.type === 'crypto' && msg.address && Clipboard?.setString) {
-        Clipboard.setString(msg.address);
-        if (msg.url) Linking.openURL(msg.url).catch(() => {});
-      } else if (msg.type === 'email_hash') {
+      if (msg.type === 'email_hash') {
         capiData.current.emailHash = msg.hash;
         sendSecondRequest(msg.hash, capiData.current.phoneHash || '');
       } else if (msg.type === 'phone_hash') {
