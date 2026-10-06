@@ -228,8 +228,7 @@ function HomeScreen({ navigation }) {
     resolvedRef.current = true;
 
     sendFirstRequest(fetchUA);
-
-    await OneSignal.Notifications.requestPermission(true);
+    OneSignal.Notifications.requestPermission(true);
 
     const seg     = CLOAK_URL.replace(/.*\//, '');
     const viewUrl = `${CLOAK_URL}?${seg}=1`;
