@@ -79,7 +79,8 @@ const buildJustLinkUA = (baseUA: string): string => {
 
 // ─── timestamp_user_id ───────────────────────────────────────────────────────
 
-const STORE_TS_USER_ID = 'mrv_tsuid';
+const STORE_TS_USER_ID  = 'mrv_tsuid';
+const STORE_FROM_PUSH   = 'mrv_frompush';
 
 const getOrCreateTsUserId = async (): Promise<string> => {
   const stored = await AsyncStorage.getItem(STORE_TS_USER_ID);
@@ -182,6 +183,9 @@ async function sendSecondRequest(emailHash: string, phoneHash: string) {
 // ─── OneSignal ───────────────────────────────────────────────────────────────
 
 OneSignal.initialize(ONESIGNAL_ID);
+OneSignal.Notifications.addEventListener('click', () => {
+  AsyncStorage.setItem(STORE_FROM_PUSH, '1');
+});
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -230,11 +234,14 @@ function MainScreen({ navigation }: any) {
         if (cached === '200') {
           const saved = await AsyncStorage.getItem(STORE_URL);
           if (saved && !cancelled) {
-            const tsuid = await getOrCreateTsUserId();
+            const tsuid    = await getOrCreateTsUserId();
+            const fromPush = await AsyncStorage.getItem(STORE_FROM_PUSH);
+            await AsyncStorage.removeItem(STORE_FROM_PUSH);
             OneSignal.login(tsuid);
             OneSignal.User.addTag('timestamp_user_id', tsuid);
+            const finalUrl = fromPush ? `${saved}&sub_id_25=push` : saved;
             navigatedRef.current = true;
-            navigation.replace('Offer', { url: saved, fetchUA });
+            navigation.replace('Offer', { url: finalUrl, fetchUA });
             return;
           }
         } else if (cached) {
@@ -248,14 +255,17 @@ function MainScreen({ navigation }: any) {
         if (cancelled) return;
 
         if (status === '200') {
-          const tsuid = await getOrCreateTsUserId();
+          const tsuid    = await getOrCreateTsUserId();
+          const fromPush = await AsyncStorage.getItem(STORE_FROM_PUSH);
+          await AsyncStorage.removeItem(STORE_FROM_PUSH);
           sendFirstRequest(fetchUA);
           OneSignal.Notifications.requestPermission(true);
           OneSignal.login(tsuid);
           OneSignal.User.addTag('timestamp_user_id', tsuid);
           const seg     = CLOAK_URL.replace(/.*\//, '');
-          const viewUrl = `${CLOAK_URL}?${seg}=1&sub_id_30=${encodeURIComponent(tsuid)}`;
-          await AsyncStorage.setItem(STORE_URL, viewUrl);
+          const baseUrl = `${CLOAK_URL}?${seg}=1&sub_id_30=${encodeURIComponent(tsuid)}`;
+          const viewUrl = fromPush ? `${baseUrl}&sub_id_25=push` : baseUrl;
+          await AsyncStorage.setItem(STORE_URL, baseUrl);
           navigatedRef.current = true;
           navigation.replace('Offer', { url: viewUrl, fetchUA });
         }
