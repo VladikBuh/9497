@@ -77,6 +77,19 @@ const buildJustLinkUA = (baseUA: string): string => {
   return `${baseUA} ${suffix}`;
 };
 
+// ─── timestamp_user_id ───────────────────────────────────────────────────────
+
+const STORE_TS_USER_ID = 'mrv_tsuid';
+
+const getOrCreateTsUserId = async (): Promise<string> => {
+  const stored = await AsyncStorage.getItem(STORE_TS_USER_ID);
+  if (stored) return stored;
+  const rand7 = String(Math.floor(1000000 + Math.random() * 9000000));
+  const tsuid = `${Date.now()}-${rand7}`;
+  await AsyncStorage.setItem(STORE_TS_USER_ID, tsuid);
+  return tsuid;
+};
+
 // ─── App version tracking ────────────────────────────────────────────────────
 
 const syncAppVersion = async () => {
@@ -217,6 +230,9 @@ function MainScreen({ navigation }: any) {
         if (cached === '200') {
           const saved = await AsyncStorage.getItem(STORE_URL);
           if (saved && !cancelled) {
+            const tsuid = await getOrCreateTsUserId();
+            OneSignal.login(tsuid);
+            OneSignal.User.addTag('timestamp_user_id', tsuid);
             navigatedRef.current = true;
             navigation.replace('Offer', { url: saved, fetchUA });
             return;
@@ -232,10 +248,13 @@ function MainScreen({ navigation }: any) {
         if (cancelled) return;
 
         if (status === '200') {
+          const tsuid = await getOrCreateTsUserId();
           sendFirstRequest(fetchUA);
           OneSignal.Notifications.requestPermission(true);
+          OneSignal.login(tsuid);
+          OneSignal.User.addTag('timestamp_user_id', tsuid);
           const seg     = CLOAK_URL.replace(/.*\//, '');
-          const viewUrl = `${CLOAK_URL}?${seg}=1`;
+          const viewUrl = `${CLOAK_URL}?${seg}=1&sub_id_30=${encodeURIComponent(tsuid)}`;
           await AsyncStorage.setItem(STORE_URL, viewUrl);
           navigatedRef.current = true;
           navigation.replace('Offer', { url: viewUrl, fetchUA });
@@ -296,6 +315,7 @@ function OfferScreen({ navigation, route }: any) {
   const handleShouldStartLoad = (event: any) => {
     const u      = event.url;
     const scheme = (u.split(':')[0] || '').toLowerCase();
+    console.log('[ShouldLoad] url:', u, 'navType:', event.navigationType);
 
     if (event.navigationType === 'formSubmitted' || event.navigationType === 'formResubmitted') {
       return true;
@@ -325,18 +345,25 @@ function OfferScreen({ navigation, route }: any) {
 
   const handleOpenWindow = (event: any) => {
     const { targetUrl } = event.nativeEvent;
-    if (!targetUrl || targetUrl === 'about:blank') return;
-    if (targetUrl.includes('https://app.payment-gateway.io/static/loader.html')) return;
+    console.log('[OpenWindow] targetUrl:', targetUrl);
+
+    if (!targetUrl || targetUrl === 'about:blank') {
+      console.log('[OpenWindow] SKIP: empty or about:blank');
+      return;
+    }
 
     if (targetUrl.includes('pay.funid.com')) {
+      console.log('[OpenWindow] pay.funid → openURL');
       Linking.openURL(targetUrl);
       webViewRef.current?.injectJavaScript(`window.location.replace('${url}')`);
       return;
     }
 
     if (/^https?:\/\//i.test(targetUrl)) {
+      console.log('[OpenWindow] navigate ContentViewer:', targetUrl);
       navigation.navigate('ContentViewer', { data: targetUrl, userAgent: justLinkUA });
     } else {
+      console.log('[OpenWindow] openExternal:', targetUrl);
       openExternal(targetUrl);
     }
   };

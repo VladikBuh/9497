@@ -43,9 +43,12 @@ export default function AppManagerChild({ navigation, route }) {
   const url = route.params.data;
   const userAgent = route.params.userAgent;
   const webViewRef = useRef(null);
+  const initialLoadRef = useRef(false);
   const [isTwoClick, setTwoClick] = useState(false);
 
   const isWebUrl = /^https?:\/\//i.test(url || '');
+
+  console.log('[ContentViewer] url:', url, 'isWebUrl:', isWebUrl, 'ua:', userAgent?.slice(0, 40));
 
   useEffect(() => {
     if (!url) return;
@@ -125,11 +128,24 @@ export default function AppManagerChild({ navigation, route }) {
             setSupportMultipleWindows={false}
             javaScriptCanOpenWindowsAutomatically
             showsVerticalScrollIndicator={false}
+            onLoadStart={e => console.log('[ContentViewer] loadStart:', e.nativeEvent.url)}
+            onLoadEnd={e => {
+              const u = e.nativeEvent.url;
+              console.log('[ContentViewer] loadEnd:', u);
+              if (u === 'about:blank' && url && !initialLoadRef.current) {
+                initialLoadRef.current = true;
+                webViewRef.current?.injectJavaScript(`window.location.replace(${JSON.stringify(url)});true;`);
+              } else if (u !== 'about:blank') {
+                initialLoadRef.current = true;
+              }
+            }}
             onError={({ nativeEvent }) => {
+              console.log('[ContentViewer] ERROR:', nativeEvent.code, nativeEvent.description);
               if (nativeEvent.code === -1101 || nativeEvent.code === -1002) {
                 navigation.goBack();
               }
             }}
+            onHttpError={({ nativeEvent }) => console.log('[ContentViewer] HTTP ERROR:', nativeEvent.statusCode, nativeEvent.url)}
           />
         )}
       </SafeAreaView>
